@@ -24,12 +24,17 @@ def parse_nmconnection_files(directory):
 def display_parameters(nmconnections):
     wifi_conns = []
     for filename, parameters in nmconnections.items():
-        if parameters['connection']['type'] == "wifi":
-            wifi_conn = {
-                'id': parameters['connection']['id'] , 
-                'uuid' : parameters['connection']['uuid'] ,
-                'ssid': parameters['wifi']['ssid'] }
-            wifi_conns.append(wifi_conn)
+        try:
+            if parameters['connection']['type'] == "wifi":
+                wifi_conn = {
+                    'id': parameters['connection']['id'] , 
+                    'uuid' : parameters['connection']['uuid'] ,
+                    'ssid': parameters['wifi']['ssid'] }
+                wifi_conns.append(wifi_conn)
+        except KeyError as e:
+            # Skip over .nmconnection files that are empty/corrupt
+            pass
+
     print(json.dumps(wifi_conns))
 
 
