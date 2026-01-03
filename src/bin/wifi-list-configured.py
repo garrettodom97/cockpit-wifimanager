@@ -1,50 +1,54 @@
-#!/usr/bin/python3
-
-import os
-import configparser
+#!/usr/bin/env python3
+import subprocess
 import json
 
-def parse_nmconnection_files(directory):
-    nmconnections = {}
+def run_nmcli(args):
+    """Run nmcli and return stdout lines."""
+    result = subprocess.run(
+        ["nmcli"] + args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True
+    )
+    return result.stdout.splitlines()
 
-    # Loop through all files in the specified directory
-    for filename in os.listdir(directory):
-        if filename.endswith('.nmconnection'):
-            filepath = os.path.join(directory, filename)
-            config = configparser.ConfigParser()
-            
-            # Read the .nmconnection file
-            config.read(filepath)
-            
-            # Store parameters in a dictionary
-            nmconnections[filename] = {section: dict(config.items(section)) for section in config.sections()}
+def get_wifi_connections():
+    # Use terse mode for easy parsing
+    lines = run_nmcli(["-t", "-f", "NAME,UUID,TYPE,DEVICE", "connection", "show"])
+    wifi_list = []
 
-    return nmconnections
+    for line in lines:
+        if not line.strip():
+            continue
 
-def display_parameters(nmconnections):
-    wifi_conns = []
-    for filename, parameters in nmconnections.items():
-        try:
-            if parameters['connection']['type'] == "wifi":
-                wifi_conn = {
-                    'id': parameters['connection']['id'] , 
-                    'uuid' : parameters['connection']['uuid'] ,
-                    'ssid': parameters['wifi']['ssid'] }
-                wifi_conns.append(wifi_conn)
-        except KeyError as e:
-            # Skip over .nmconnection files that are empty/corrupt
-            pass
+        name, uuid, ctype, device = line.split(":", 3)
 
-    print(json.dumps(wifi_conns))
+        if ctype != "802-11-wireless":
+            continue
 
+        ssid = get_ssid(uuid)
 
-if __name__ == '__main__':
-    # Specify the directory containing .nmconnection files
-    directory = '/etc/NetworkManager/system-connections'
-    
-    # Parse the files
-    nmconnections = parse_nmconnection_files(directory)
-    
-    # Display the parameters
-    display_parameters(nmconnections)
+        wifi_list.append({
+            "id": name,
+            "uuid": uuid,
+            "ssid": ssid
+        })
+
+    return wifi_list
+
+def get_ssid(uuid):
+    """Extract SSID from nmcli connection show <uuid>."""
+    detail = run_nmcli(["-t", "-f", "802-11-wireless.ssid", "connection", "show", uuid])
+
+    # Output looks like: "802-11-wireless.ssid:MyNetwork"
+    for line in detail:
+        if line.startswith("802-11-wireless.ssid:"):
+            return line.split(":", 1)[1]
+
+    return None  # If no SSID found
+
+if __name__ == "__main__":
+    wifi_connections = get_wifi_connections()
+    print(json.dumps(wifi_connections, indent=2))
 

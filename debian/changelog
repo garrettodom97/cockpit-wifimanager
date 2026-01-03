@@ -1,3 +1,9 @@
+cockpit-wifimanager (1.2.0-1) unstable; urgency=medium
+
+  * Deal with Trixie installs that use netplan 
+
+ -- Jason McCormick <jason@mfamily.org>  Fri, 02 Jan 2026 20:33:22 -0500
+
 cockpit-wifimanager (1.1.1-1) unstable; urgency=medium
 
   * Fix parsing errors on present-but-empty .nmconnection files
