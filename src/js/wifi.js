@@ -3,13 +3,11 @@ const button = document.getElementById("wifi-scan-btn");
 const setbutton = document.getElementById("set-wifi-btn");
 const setresult = document.getElementById("set-wifi-results");
 const conlist = document.getElementById("wifi-conn-list");
-const delbutton = document.getElementById("del-wifi-btn");
-const delresult = document.getElementById("del-wifi-results");
+var configuredSSIDs = [];
 
 document.addEventListener("DOMContentLoaded", function() {
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
-	delbutton.addEventListener("click" , del_wifi_run);
 	get_wifi_run();
 
 	// Send a 'init' message.  This tells integration tests that we are ready to go
@@ -154,32 +152,176 @@ function get_wifi_output(dataStr){
 }
 
 
-// WIFi Delete Connection Functions
-function del_wifi_run() {
-	const net_name = document.getElementById("wifi-ssid-del");
-
-	if( net_name.value.length < 1 || net_name.value.length > 32 ){
-		net_name.classList.add("is-invalid");
-		delresult.innerHTML = `<span class="wifi-scan-error">Conn label must be between 1 and 32 characters</span>`;
-		return false;
-	} else {
-		net_name.classList.remove("is-invalid");
-	}
-
-    cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-del-configured.sh", net_name.value] ,
-        { superuser: "require" } )
-            .stream(del_wifi_output)
-            .catch(del_wifi_fail);
-}
-
-function del_wifi_fail() {
-	delresult.innerHTML = `<span class="wifi-scan-error">Failed to delete connection</scan>`;
-}
-
-function del_wifi_output(data){
-	delresult.innerHTML = `${data}`;
-	get_wifi_run();
+// Delete a configured WiFi network
+function del_wifi_run(connId) {
+    if (!confirm("Are you sure you want to delete the network \"" + connId + "\"?")) {
+        return;
+    }
+    cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-del-configured.sh", connId],
+        { superuser: "require" })
+            .then(function() {
+                setTimeout(function() { get_wifi_run(); }, 2000);
+            })
+            .catch(function() {
+                conlist.innerHTML = '<span class="wifi-scan-error">Failed to delete ' + connId + '</span>';
+            });
 }
 
 
 
+// Add a scanned network to saved configurations (without connecting)
+function scan_add_config_run(ssid) {
+    var password = prompt("Enter password for \"" + ssid + "\":");
+    if (password === null) return; // cancelled
+
+    if (password.length > 0 && (password.length < 8 || password.length > 64)) {
+        result.innerHTML = '<span class="wifi-scan-error">Password must be 8-64 characters</span>';
+        return;
+    }
+
+    result.innerHTML = '<span class="wifi-scan-loader"></span> Adding ' + ssid + ' to saved networks...';
+    var args = ["/usr/share/cockpit/wifimanager/bin/wifi-set.sh", ssid, password];
+    if (!password.length) {
+        args = ["/usr/share/cockpit/wifimanager/bin/wifi-set.sh", ssid, ""];
+    }
+
+    cockpit.spawn(args, { superuser: "require" })
+        .then(function() {
+            result.innerHTML = '<span class="text-success">Added ' + ssid + '.</span>';
+            conlist.insertAdjacentHTML('beforeend', '<div class="mt-2"><span class="wifi-scan-loader"></span> Updating configured networks...</div>');
+            setTimeout(function() { result.innerHTML = ''; get_wifi_run(); }, 2000);
+        })
+        .catch(function() {
+            result.innerHTML = '<span class="wifi-scan-error">Failed to add ' + ssid + '</span>';
+        });
+}
+
+// Override wifi_scan_output to add Connect buttons to scan results
+var _original_wifi_scan_output = wifi_scan_output;
+wifi_scan_output = function(dataStr) {
+    var data = JSON.parse(dataStr);
+    data = data.filter(function(item) { return configuredSSIDs.indexOf(item["ssid"]) === -1; });
+    if (!data.length) {
+        result.innerHTML = '<i>No new networks found</i>';
+        return;
+    }
+    const table = document.createElement('table');
+    table.classList.add("table", "table-striped", "table-hover");
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    ["SSID", "SIGNAL", ""].forEach(function(label) {
+        const th = document.createElement('th');
+        th.setAttribute("scope", "col");
+        th.textContent = label;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    data.forEach(function(item) {
+        const row = document.createElement('tr');
+        const tdSsid = document.createElement('td');
+        tdSsid.textContent = item["ssid"];
+        row.appendChild(tdSsid);
+        const tdSignal = document.createElement('td');
+        tdSignal.textContent = item["signal"] + "%";
+        row.appendChild(tdSignal);
+        const td = document.createElement('td');
+        const btn = document.createElement("button");
+        btn.textContent = "Add";
+        btn.classList.add("btn", "btn-sm", "btn-outline-primary");
+        btn.addEventListener("click", function() { scan_add_config_run(item["ssid"]); });
+        td.appendChild(btn);
+        row.appendChild(td);
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    result.innerHTML = "";
+    result.appendChild(table);
+};
+
+// Connect to an already-configured network
+function connect_wifi_run(connId) {
+    if (!confirm("Changing WiFi networks may disconnect your current session if you are not connected via ethernet. If disconnected, you may need to reconnect to Cockpit on a new IP address. Continue?")) {
+        return;
+    }
+    var old = document.getElementById('wifi-connect-status');
+    if (old) old.remove();
+    conlist.insertAdjacentHTML('beforeend', '<div id="wifi-connect-status" class="mt-2"><span class="wifi-scan-loader"></span> Connecting to ' + connId + '...</div>');
+    cockpit.spawn(["nmcli", "connection", "up", connId],
+        { superuser: "require" })
+            .then(function() {
+                var status = document.getElementById('wifi-connect-status');
+                if (status) status.remove();
+                setTimeout(function() { get_wifi_run(); }, 2000);
+            })
+            .catch(function() {
+                var status = document.getElementById('wifi-connect-status');
+                if (status) status.innerHTML = '<span class="wifi-scan-error">Failed to connect to ' + connId + '</span>';
+            });
+}
+
+// Override get_wifi_output to add Connect button to configured networks
+var _original_get_wifi_output = get_wifi_output;
+get_wifi_output = function(dataStr) {
+    const data = JSON.parse(dataStr);
+    configuredSSIDs = data.map(function(item) { return item["ssid"]; });
+    if (!data.length) {
+        document.getElementById('wifi-conn-list').innerHTML = '<i>No configured networks</i>';
+        return;
+    }
+    render_wifi_table(data);
+};
+
+function render_wifi_table(data) {
+    const table = document.createElement('table');
+    table.classList.add("table", "table-striped", "table-hover");
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    ["ID", "UUID", "SSID", "STATUS", "", ""].forEach(function(label) {
+        const th = document.createElement('th');
+        th.setAttribute("scope", "col");
+        th.textContent = label;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    data.forEach(function(item) {
+        const row = document.createElement('tr');
+        ["id", "uuid", "ssid"].forEach(function(col) {
+            const td = document.createElement('td');
+            td.textContent = item[col];
+            row.appendChild(td);
+        });
+        const tdStatus = document.createElement('td');
+        if (item["active"]) {
+            tdStatus.innerHTML = '<span class="badge bg-success">Active</span>';
+        }
+        row.appendChild(tdStatus);
+        const tdConnect = document.createElement('td');
+        if (!item["active"]) {
+            const btnConnect = document.createElement("button");
+            btnConnect.textContent = "Connect";
+            btnConnect.classList.add("btn", "btn-sm", "btn-outline-primary");
+            btnConnect.addEventListener("click", function() { connect_wifi_run(item["id"]); });
+            tdConnect.appendChild(btnConnect);
+        }
+        row.appendChild(tdConnect);
+        const tdDelete = document.createElement('td');
+        const btnDelete = document.createElement("button");
+        btnDelete.textContent = "Delete";
+        btnDelete.classList.add("btn", "btn-sm", "btn-outline-danger");
+        btnDelete.addEventListener("click", function() { del_wifi_run(item["id"]); });
+        tdDelete.appendChild(btnDelete);
+        row.appendChild(tdDelete);
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    document.getElementById('wifi-conn-list').innerHTML = "";
+    document.getElementById('wifi-conn-list').appendChild(table);
+}
