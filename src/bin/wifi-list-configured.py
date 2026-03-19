@@ -32,7 +32,8 @@ def get_wifi_connections():
         wifi_list.append({
             "id": name,
             "uuid": uuid,
-            "ssid": ssid
+            "ssid": ssid,
+            "active": bool(device)
         })
 
     return wifi_list
