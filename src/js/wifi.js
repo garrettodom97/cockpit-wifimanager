@@ -133,14 +133,18 @@ function get_wifi_output(dataStr) {
 
 
 // Delete a configured WiFi network
-function del_wifi_run(connId) {
+function del_wifi_run(connId, isActive) {
     if (!confirm("Are you sure you want to delete the network \"" + connId + "\"?")) {
         return;
     }
     cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-del-configured.sh", connId],
         { superuser: "require" })
             .then(function() {
-                get_wifi_run();
+                if (isActive) {
+                    setTimeout(function() { get_wifi_run(); }, 2000);
+                } else {
+                    get_wifi_run();
+                }
             })
             .catch(function() {
                 conlist.innerHTML = '<span class="wifi-scan-error">Failed to delete ' + connId + '</span>';
@@ -230,7 +234,7 @@ function render_wifi_table(data) {
         const btnDelete = document.createElement("button");
         btnDelete.textContent = "Delete";
         btnDelete.classList.add("btn", "btn-sm", "btn-outline-danger");
-        btnDelete.addEventListener("click", function() { del_wifi_run(item["id"]); });
+        btnDelete.addEventListener("click", function() { del_wifi_run(item["id"], item["active"]); });
         tdDelete.appendChild(btnDelete);
         row.appendChild(tdDelete);
         tbody.appendChild(row);
