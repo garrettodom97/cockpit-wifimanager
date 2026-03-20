@@ -140,7 +140,7 @@ function del_wifi_run(connId) {
     cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-del-configured.sh", connId],
         { superuser: "require" })
             .then(function() {
-                setTimeout(function() { get_wifi_run(); }, 2000);
+                get_wifi_run();
             })
             .catch(function() {
                 conlist.innerHTML = '<span class="wifi-scan-error">Failed to delete ' + connId + '</span>';
@@ -161,8 +161,7 @@ function scan_add_config_run(ssid) {
     cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-set.sh", ssid, password], { superuser: "require" })
         .then(function() {
             result.innerHTML = '<span class="text-success">Added ' + ssid + '.</span>';
-            conlist.insertAdjacentHTML('beforeend', '<div class="mt-2"><span class="wifi-scan-loader"></span> Updating configured networks...</div>');
-            setTimeout(function() { result.innerHTML = ''; get_wifi_run(); }, 2000);
+            get_wifi_run();
         })
         .catch(function() {
             result.innerHTML = '<span class="wifi-scan-error">Failed to add ' + ssid + '</span>';
@@ -182,7 +181,7 @@ function connect_wifi_run(connId) {
             .then(function() {
                 var status = document.getElementById('wifi-connect-status');
                 if (status) status.remove();
-                setTimeout(function() { get_wifi_run(); }, 2000);
+                get_wifi_run();
             })
             .catch(function() {
                 var status = document.getElementById('wifi-connect-status');
