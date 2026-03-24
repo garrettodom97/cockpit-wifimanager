@@ -8,13 +8,20 @@ var configuredSSIDs = [];
 document.addEventListener("DOMContentLoaded", function() {
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
-	get_wifi_run();
+	if (!cockpit.superuser.allowed) {
+		conlist.innerHTML = '<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>';
+	} else {
+		get_wifi_run();
+	}
 
-	cockpit.superuser.addEventListener("changed", function() {
-		if (cockpit.superuser.allowed) {
+	var wasAllowed = cockpit.superuser.allowed;
+	setInterval(function() {
+		var isAllowed = cockpit.superuser.allowed;
+		if (!wasAllowed && isAllowed) {
 			location.reload();
 		}
-	});
+		wasAllowed = isAllowed;
+	}, 1000);
 
 	// Send a 'init' message.  This tells integration tests that we are ready to go
 	cockpit.transport.wait(function() { });
