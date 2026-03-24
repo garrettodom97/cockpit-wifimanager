@@ -118,7 +118,7 @@ function get_wifi_run() {
 }
 
 function get_wifi_fail() {
-	conlist.innerHTML = `<span class="wifi-scan-error">WiFi list failed</span>`;
+	conlist.innerHTML = `<span class="wifi-scan-error">Failed to load WiFi networks. If you have not elevated your privileges, please do so using the toggle in the top bar.</span>`;
 }
 
 function get_wifi_output(dataStr) {
