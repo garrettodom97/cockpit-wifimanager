@@ -118,7 +118,11 @@ function get_wifi_run() {
 }
 
 function get_wifi_fail() {
-	conlist.innerHTML = `<span class="wifi-scan-error">Failed to load WiFi networks. If you have not elevated your privileges, please do so using the toggle in the top bar.</span>`;
+	if (cockpit.superuser.allowed === false) {
+		conlist.innerHTML = `<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>`;
+	} else {
+		conlist.innerHTML = `<span class="wifi-scan-error">Failed to load WiFi networks.</span>`;
+	}
 }
 
 function get_wifi_output(dataStr) {
