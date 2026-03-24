@@ -111,9 +111,11 @@ function set_wifi_output(data) {
 
 // WiFi Get Connections Functions
 function get_wifi_run() {
+    var dataReceived = false;
     cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-list-configured.py"] ,
         { superuser: "require" } )
-            .stream(get_wifi_output)
+            .stream(function(data) { dataReceived = true; get_wifi_output(data); })
+            .then(function() { if (!dataReceived) get_wifi_fail(); })
             .catch(get_wifi_fail);
 }
 
