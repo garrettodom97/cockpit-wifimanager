@@ -4,11 +4,20 @@ const setbutton = document.getElementById("set-wifi-btn");
 const setresult = document.getElementById("set-wifi-results");
 const conlist = document.getElementById("wifi-conn-list");
 var configuredSSIDs = [];
+var permission = cockpit.permission({ admin: true });
 
 document.addEventListener("DOMContentLoaded", function() {
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
 	get_wifi_run();
+
+	function onPermissionChanged() {
+		if (permission.allowed) {
+			permission.removeEventListener("changed", onPermissionChanged);
+			get_wifi_run();
+		}
+	}
+	permission.addEventListener("changed", onPermissionChanged);
 
 	// Send a 'init' message.  This tells integration tests that we are ready to go
 	cockpit.transport.wait(function() { });
@@ -120,7 +129,11 @@ function get_wifi_run() {
 }
 
 function get_wifi_fail() {
-	conlist.innerHTML = `<span class="wifi-scan-error">Failed to load WiFi networks. If privileges are not elevated, please do so using the toggle in the top bar.</span>`;
+	if (!permission.allowed) {
+		conlist.innerHTML = `<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>`;
+	} else {
+		conlist.innerHTML = `<span class="wifi-scan-error">Failed to load WiFi networks.</span>`;
+	}
 }
 
 function get_wifi_output(dataStr) {
