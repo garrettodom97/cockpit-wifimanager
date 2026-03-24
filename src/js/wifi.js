@@ -8,26 +8,7 @@ var configuredSSIDs = [];
 document.addEventListener("DOMContentLoaded", function() {
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
-
-	function init_wifi() {
-		if (cockpit.superuser.allowed === false) {
-			conlist.innerHTML = '<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>';
-		} else if (cockpit.superuser.allowed === true) {
-			get_wifi_run();
-		} else {
-			setTimeout(init_wifi, 100);
-		}
-	}
-	init_wifi();
-
-	var wasAllowed = cockpit.superuser.allowed;
-	setInterval(function() {
-		var isAllowed = cockpit.superuser.allowed;
-		if (wasAllowed === false && isAllowed === true) {
-			location.reload();
-		}
-		wasAllowed = isAllowed;
-	}, 1000);
+	get_wifi_run();
 
 	// Send a 'init' message.  This tells integration tests that we are ready to go
 	cockpit.transport.wait(function() { });
@@ -137,11 +118,7 @@ function get_wifi_run() {
 }
 
 function get_wifi_fail() {
-	if (!cockpit.superuser.allowed) {
-		conlist.innerHTML = `<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>`;
-	} else {
-		conlist.innerHTML = `<span class="wifi-scan-error">WiFi list failed</span>`;
-	}
+	conlist.innerHTML = `<span class="wifi-scan-error">WiFi list failed</span>`;
 }
 
 function get_wifi_output(dataStr) {
