@@ -165,7 +165,7 @@ function scan_add_config_run(ssid) {
     cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-set.sh", ssid, password], { superuser: "require" })
         .then(function() {
             result.innerHTML = '<span class="text-success">Added ' + ssid + '.</span>';
-            get_wifi_run();
+            setTimeout(function() { result.innerHTML = ''; get_wifi_run(); }, 2000);
         })
         .catch(function() {
             result.innerHTML = '<span class="wifi-scan-error">Failed to add ' + ssid + '</span>';
