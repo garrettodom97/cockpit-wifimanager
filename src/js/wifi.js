@@ -8,11 +8,17 @@ var configuredSSIDs = [];
 document.addEventListener("DOMContentLoaded", function() {
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
-	if (cockpit.superuser.allowed === false) {
-		conlist.innerHTML = '<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>';
-	} else {
-		get_wifi_run();
+
+	function init_wifi() {
+		if (cockpit.superuser.allowed === false) {
+			conlist.innerHTML = '<span class="wifi-scan-error">Administrative access is required. Please elevate your privileges using the toggle in the top bar.</span>';
+		} else if (cockpit.superuser.allowed === true) {
+			get_wifi_run();
+		} else {
+			setTimeout(init_wifi, 100);
+		}
 	}
+	init_wifi();
 
 	var wasAllowed = cockpit.superuser.allowed;
 	setInterval(function() {
