@@ -13,16 +13,29 @@ def run_nmcli(args):
     )
     return result.stdout.splitlines()
 
+def get_active_connections():
+    """Return set of connection names that are fully activated."""
+    lines = run_nmcli(["-t", "-f", "NAME,STATE", "connection", "show", "--active"])
+    active = set()
+    for line in lines:
+        if not line.strip():
+            continue
+        name, state = line.split(":", 1)
+        if state == "activated":
+            active.add(name)
+    return active
+
 def get_wifi_connections():
     # Use terse mode for easy parsing
-    lines = run_nmcli(["-t", "-f", "NAME,UUID,TYPE,DEVICE", "connection", "show"])
+    lines = run_nmcli(["-t", "-f", "NAME,UUID,TYPE", "connection", "show"])
+    active = get_active_connections()
     wifi_list = []
 
     for line in lines:
         if not line.strip():
             continue
 
-        name, uuid, ctype, device = line.split(":", 3)
+        name, uuid, ctype = line.split(":", 2)
 
         if ctype != "802-11-wireless":
             continue
@@ -32,7 +45,8 @@ def get_wifi_connections():
         wifi_list.append({
             "id": name,
             "uuid": uuid,
-            "ssid": ssid
+            "ssid": ssid,
+            "active": name in active
         })
 
     return wifi_list
