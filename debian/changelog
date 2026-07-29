@@ -1,3 +1,12 @@
+cockpit-wifimanager (1.2.0-1scorebird4) unstable; urgency=medium
+
+  * Run the integration hook when connecting to an already-saved network as well.
+    That path called nmcli directly from the UI and skipped the hook, so on a host
+    sharing the radio the client associated on a new channel while the other service
+    still held the old one.
+
+ -- Byron Appelt <bappelt@nevco.com>  Wed, 29 Jul 2026 17:49:33 -0500
+
 cockpit-wifimanager (1.2.0-1scorebird3) unstable; urgency=medium
 
   * Replace the hardcoded nest-access-point.service references with a generic
