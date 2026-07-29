@@ -7,13 +7,14 @@ if [ -z "$1" ]; then
 	exit 1
 fi
 
+# Optional site hook for a service sharing the wifi radio. See wifi-hook.sh.
+. "$(dirname "$0")/wifi-hook.sh"
+
 nmcli conn delete "$1"
 
-# If no wifi profiles remain, bring the AP back so the device is reachable
-# again for fresh provisioning. Use 'restart' (not 'start') because the unit
-# is a Type=oneshot RemainAfterExit=yes; if its last run no-op'd ("wifi
-# connection profile present; not starting AP"), systemd still considers it
-# active and 'start' becomes a no-op. 'restart' always re-runs ExecStart.
+# Deleting the last wifi profile can leave a headless host with no network path in at
+# all. Tell the hook, so anything that provides a fallback — a setup access point, say
+# — can come back and keep the machine reachable for fresh provisioning.
 if ! nmcli -t -f TYPE connection show | grep -q "^802-11-wireless$"; then
-	sudo systemctl restart nest-access-point.service
+	run_wifi_hook profiles-cleared
 fi

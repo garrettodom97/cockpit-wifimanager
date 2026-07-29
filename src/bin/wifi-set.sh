@@ -8,17 +8,23 @@ if [ -z "$1" ] || [ -z "$2" ]; then
 	exit 1
 fi
 
-# Pick the wifi device. In AP-only mode there's only one wifi vif; in any other
-# mode we skip unmanaged vifs (e.g. the AP vif) and use the first NM-managed
-# one. Doing this lookup BEFORE we stop the AP ensures the right interface
-# regardless of current AP state.
+# Optional site hook for a service sharing the wifi radio. See wifi-hook.sh.
+. "$(dirname "$0")/wifi-hook.sh"
+
+# Pick the wifi device: the first one NetworkManager is willing to manage. Skipping
+# unmanaged vifs avoids picking an interface some other service holds, and it must
+# also be quoted below — an unquoted expansion word-splits into an invalid nmcli
+# argument list on a host with more than one wifi netdev.
+#
+# Done BEFORE the hook releases the device, so the right interface is chosen
+# regardless of what state that service left it in.
 WLAN_DEV=$(nmcli -t -f DEVICE,TYPE,STATE device status | \
 	awk -F: '$2=="wifi" && $3!="unmanaged" {print $1; exit}')
 
 if [ -z "$WLAN_DEV" ]; then
-	# No managed wifi yet — must be because the AP is running on it. Stop AP
-	# so NM takes the wifi vif back, then pick it.
-	sudo systemctl stop nest-access-point.service
+	# Nothing managed at all: most likely another service is holding the only
+	# radio. Ask it to release, then look again.
+	run_wifi_hook before-apply
 	sleep 2
 	WLAN_DEV=$(nmcli -t -f DEVICE,TYPE,STATE device status | \
 		awk -F: '$2=="wifi" && $3!="unmanaged" {print $1; exit}')
@@ -50,14 +56,15 @@ nmcli conn add type wifi ifname "${WLAN_DEV}" \
 	con-name "$1" autoconnect no ssid "$1" \
 	wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$2"
 
-# Make sure the AP is stopped, then activate the wifi connection.
-sudo systemctl stop nest-access-point.service
+# Release the radio, then activate explicitly rather than relying on autoconnect, so
+# the outcome of the association is observable and can be rolled back.
+run_wifi_hook before-apply
 if ! nmcli conn up "$1"; then
-	# Activation failed (wrong password, network out of range, etc.).
-	# Remove the bad profile and bring the AP back so the user can retry.
-	# Use 'restart' instead of 'start' — the oneshot may be active(exited).
+	# Activation failed (wrong password, network out of range, etc.). Remove the bad
+	# profile and let the hook restore whatever it stood down, so the user still has
+	# a way to reach this page and retry.
 	nmcli conn delete "$1" 2>/dev/null
-	sudo systemctl restart nest-access-point.service
+	run_wifi_hook apply-failed
 	exit 1
 fi
 
