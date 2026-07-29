@@ -7,19 +7,6 @@ var configuredSSIDs = [];
 var permission = cockpit.permission({ admin: true });
 
 document.addEventListener("DOMContentLoaded", function() {
-	// Hide the scan section when the AP is up. The single-radio chip can't
-	// scan while beaconing, so the scan button would always fail. Manual
-	// SSID entry below still works.
-	// systemctl is-active --quiet exits 0 when active, non-zero otherwise.
-	cockpit.spawn(["systemctl", "is-active", "--quiet", "nest-access-point.service"])
-		.then(function() {
-			const scanSection = document.getElementById("scan-results");
-			if (scanSection && scanSection.parentElement) {
-				scanSection.parentElement.style.display = "none";
-			}
-		})
-		.catch(function() { /* AP not active, leave scan button visible */ });
-
 	button.addEventListener("click", wifi_scan_run);
 	setbutton.addEventListener("click" , set_wifi_run);
 	get_wifi_run();

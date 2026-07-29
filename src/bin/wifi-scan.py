@@ -2,16 +2,6 @@
 
 import json
 import subprocess
-import sys
-
-
-AP_SERVICE = "nest-access-point.service"
-
-
-def ap_is_active() -> bool:
-    return subprocess.run(
-        ["systemctl", "is-active", "--quiet", AP_SERVICE]
-    ).returncode == 0
 
 
 def get_wifi_networks():
@@ -41,12 +31,6 @@ def get_wifi_networks():
 
 
 def main():
-    # We can't scan while the AP is up — the single radio is locked to AP mode
-    # on its channel. Just fail; the user can enter the SSID manually instead.
-    if ap_is_active():
-        print("Cannot scan while access point is active. Enter SSID manually.")
-        sys.exit(1)
-
     results = get_wifi_networks()
     if not results:
         print("No Wi-Fi networks found.")
