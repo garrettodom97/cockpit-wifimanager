@@ -12,5 +12,21 @@ Rules-Requires-Root: binary-targets
 Package: cockpit-wifimanager
 Architecture: all
 Depends: ${misc:Depends}, cockpit, network-manager
+# Scorebird-specific, and transitional. Until 2026-07 the NeST firmware shipped this
+# plugin's files inside its own nest-cockpit package. Taking ownership of paths another
+# installed package owns needs Replaces, or dpkg refuses the unpack with "trying to
+# overwrite '/usr/share/cockpit/wifimanager/...', which is also in package
+# nest-cockpit". Only upgrades are affected; a fresh install never conflicts.
+#
+# Bounded at << 3.6.0 so it expires on its own rather than lingering forever. Every
+# nest-cockpit that ever shipped these paths is below that: the 3.5.x releases, and the
+# 3.6.0~pre* builds, since ~ sorts below the bare version. A released 3.6.0 or later
+# does not ship them, so from then on this declaration is inert and can be deleted
+# whenever anyone happens to be in here.
+#
+# Deliberately no Breaks: that would make the co-installed nest-cockpit — which depends
+# on this package — look unsatisfiable in the same transaction. Replaces alone is a
+# file-ownership override, not a supersession, so both packages stay installed.
+Replaces: nest-cockpit (<< 3.6.0)
 Description: A simple pluging for Cockpit to manage
   wireless network connections

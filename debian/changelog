@@ -1,3 +1,28 @@
+cockpit-wifimanager (1.2.0-1scorebird1) unstable; urgency=medium
+
+  * Modified by Nevco/Scorebird for NeST scoreboard devices. This is not an
+    AllStarLink build. Changes relative to 1.2.0-1:
+  * wifi-set.sh: select the NetworkManager-managed wifi device and quote the
+    expansion, so it cannot word-split into an invalid nmcli argument list when a
+    second wifi vif is present.
+  * wifi-set.sh: create the connection profile in one call with the PSK included
+    and autoconnect held off until activation succeeds, so NetworkManager cannot
+    auto-activate a secret-less profile and fail it with reason 'no-secrets'.
+  * wifi-scan.py: split scan output on the first colon only and skip blank lines,
+    so a single SSID containing a colon cannot abort the entire scan.
+  * wifi-set.sh, wifi-del-configured.sh, wifi-scan.py, wifi.js: stop, restore and
+    account for nest-access-point.service, which shares the device's single radio
+    with the wifi client. These parts are NeST-specific.
+  * Declare Replaces: nest-cockpit (<< 3.6.0). The NeST firmware shipped this
+    plugin's files inside its own nest-cockpit package until 3.6.0, so without this
+    dpkg refuses to unpack on upgrade from such a version. Bounded so it expires by
+    itself once 3.6.0 is released. No Breaks: that would make the co-installed
+    nest-cockpit, which depends on this package, look unsatisfiable.
+  * Corresponding source: https://github.com/garrettodom97/cockpit-wifimanager
+    branch scorebird-nest-ap, tag scorebird-2.
+
+ -- Byron Appelt <bappelt@nevco.com>  Wed, 29 Jul 2026 16:21:54 -0500
+
 cockpit-wifimanager (1.2.0-1) unstable; urgency=medium
 
   * Deal with Trixie installs that use netplan 
