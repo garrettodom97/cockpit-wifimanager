@@ -195,7 +195,10 @@ function connect_wifi_run(connId) {
     var old = document.getElementById('wifi-connect-status');
     if (old) old.remove();
     conlist.insertAdjacentHTML('beforeend', '<div id="wifi-connect-status" class="mt-2"><span class="wifi-scan-loader"></span> Connecting to ' + connId + '...</div>');
-    cockpit.spawn(["nmcli", "connection", "up", connId],
+    // Via wifi-connect.sh rather than nmcli directly, so the integration hook runs
+    // here too. Calling nmcli straight from here skipped it, leaving a service that
+    // shares the radio holding it through the handshake.
+    cockpit.spawn(["/usr/share/cockpit/wifimanager/bin/wifi-connect.sh", connId],
         { superuser: "require" })
             .then(function() {
                 var status = document.getElementById('wifi-connect-status');
