@@ -1,10 +1,20 @@
 #!/usr/bin/python3
 
-import subprocess
 import json
+import subprocess
+import sys
+
+
+AP_SERVICE = "nest-access-point.service"
+
+
+def ap_is_active() -> bool:
+    return subprocess.run(
+        ["systemctl", "is-active", "--quiet", AP_SERVICE]
+    ).returncode == 0
+
 
 def get_wifi_networks():
-    # Run the nmcli command to get Wi-Fi networks
     try:
         output = subprocess.check_output(
             ["nmcli", "-f", "ssid,signal", "-t", "-c", "no", "dev", "wifi", "list", "--rescan", "yes"],
@@ -14,40 +24,35 @@ def get_wifi_networks():
         print(f"Error executing nmcli command: {e}")
         return []
 
-    # Parse the output
     networks = {}
-    for line in output.strip().split('\n'):
-        # Skip blank lines, and split only on the first colon: an SSID may
-        # legitimately contain one, which would otherwise raise ValueError and
-        # abort the whole scan.
-        if ':' not in line:
+    for line in output.strip().split("\n"):
+        if ":" not in line:
             continue
-        ssid, signal = line.split(':', 1)
-        # Only add networks with a non-blank SSID
-        if ssid:
-            signal = int(signal)
-            # Store the highest signal strength for each SSID
-            if ssid not in networks or networks[ssid] < signal:
-                networks[ssid] = signal
+        ssid, signal = line.split(":", 1)
+        if not ssid:
+            continue
+        signal = int(signal)
+        if ssid not in networks or networks[ssid] < signal:
+            networks[ssid] = signal
 
-    # Create a list of dictionaries for JSON output
-    json_output = [{'ssid': ssid, 'signal': signal} for ssid, signal in networks.items()]
+    results = [{"ssid": ssid, "signal": signal} for ssid, signal in networks.items()]
+    results.sort(key=lambda x: x["signal"], reverse=True)
+    return results
 
-    # Sort the list by signal strength (strongest first)
-    json_output.sort(key=lambda x: x['signal'], reverse=True)
-
-    return json_output
 
 def main():
-    wifi_networks = get_wifi_networks()
-    
-    if not wifi_networks:
+    # We can't scan while the AP is up — the single radio is locked to AP mode
+    # on its channel. Just fail; the user can enter the SSID manually instead.
+    if ap_is_active():
+        print("Cannot scan while access point is active. Enter SSID manually.")
+        sys.exit(1)
+
+    results = get_wifi_networks()
+    if not results:
         print("No Wi-Fi networks found.")
         return
+    print(json.dumps(results))
 
-    # Print the JSON output
-    print(json.dumps(wifi_networks))
 
 if __name__ == "__main__":
     main()
-
