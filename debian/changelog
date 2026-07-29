@@ -1,3 +1,12 @@
+cockpit-wifimanager (1.2.0-1scorebird3) unstable; urgency=medium
+
+  * Replace the hardcoded nest-access-point.service references with a generic
+    /etc/cockpit-wifimanager/hook, so the radio-sharing integration is no longer
+    specific to one downstream and this plugin carries no NeST-specific code at all.
+    No hook installed means no integration, as upstream.
+
+ -- Byron Appelt <bappelt@nevco.com>  Wed, 29 Jul 2026 17:30:59 -0500
+
 cockpit-wifimanager (1.2.0-1scorebird2) unstable; urgency=medium
 
   * Allow scanning while the access point is up. The guard assumed a single-radio
