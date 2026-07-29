@@ -17,7 +17,12 @@ def get_wifi_networks():
     # Parse the output
     networks = {}
     for line in output.strip().split('\n'):
-        ssid, signal = line.split(':')
+        # Skip blank lines, and split only on the first colon: an SSID may
+        # legitimately contain one, which would otherwise raise ValueError and
+        # abort the whole scan.
+        if ':' not in line:
+            continue
+        ssid, signal = line.split(':', 1)
         # Only add networks with a non-blank SSID
         if ssid:
             signal = int(signal)
