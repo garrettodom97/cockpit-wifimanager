@@ -8,27 +8,16 @@ if [ -z "$1" ] || [ -z "$2" ]; then
 	exit 1
 fi
 
-# Pick the wifi device: the first one NetworkManager is willing to manage.
-#
-# The previous lookup returned *every* wifi netdev. On a host with a second wifi
-# vif — an access point running alongside the client, say — that is two names, and
-# unquoted ${WLAN_DEV} then word-splits into
-#
-#     nmcli conn add type wifi ifname <sta> <ap> con-name ...
-#
-# where nmcli reads the second name as a setting.property and fails with
-# `invalid <setting>.<property> '<ap>'`. The profile is never created, so every
-# attempt to join a network fails identically.
-#
-# Filtering on STATE != unmanaged also picks the client rather than the AP vif,
-# since NetworkManager does not manage an interface held by hostapd. Doing this
-# lookup BEFORE stopping the AP gets the right interface regardless of AP state.
+# Pick the wifi device. In AP-only mode there's only one wifi vif; in any other
+# mode we skip unmanaged vifs (e.g. the AP vif) and use the first NM-managed
+# one. Doing this lookup BEFORE we stop the AP ensures the right interface
+# regardless of current AP state.
 WLAN_DEV=$(nmcli -t -f DEVICE,TYPE,STATE device status | \
 	awk -F: '$2=="wifi" && $3!="unmanaged" {print $1; exit}')
 
 if [ -z "$WLAN_DEV" ]; then
-	# No managed wifi at all: on a NeST device that means the AP has claimed the
-	# only radio. Stop it so NetworkManager takes the vif back, then look again.
+	# No managed wifi yet — must be because the AP is running on it. Stop AP
+	# so NM takes the wifi vif back, then pick it.
 	sudo systemctl stop nest-access-point.service
 	sleep 2
 	WLAN_DEV=$(nmcli -t -f DEVICE,TYPE,STATE device status | \
@@ -40,24 +29,37 @@ if [ -z "$WLAN_DEV" ]; then
 	exit 1
 fi
 
+# Create the connection profile in ONE call, PSK included, with autoconnect off.
+#
+# Setting the PSK in a later `nmcli conn modify` leaves a window where the profile
+# exists with autoconnect enabled but no secret, and NetworkManager's autoconnect
+# policy claims it in that window. Observed on the device: auto-activation fired
+# 10ms after the key-mgmt update and failed the connection with
+# reason 'no-secrets' 320ms before the PSK landed.
+#
+# That only happens when no wifi is currently active — NM has no reason to
+# auto-activate a new profile while another is up — which makes first-time
+# provisioning the case that hits it. It is also self-sustaining: the failure leaves
+# the device disconnected, so every retry is in the same vulnerable state.
+#
+# autoconnect stays off until the activation below succeeds, so NM cannot race this
+# script for control of the profile, and a profile that never worked cannot come
+# back on the next boot.
 nmcli conn delete "$1" 2>/dev/null
 nmcli conn add type wifi ifname "${WLAN_DEV}" \
-	con-name "$1" autoconnect yes ssid "$1"
-nmcli conn modify "$1" wifi-sec.key-mgmt wpa-psk
-nmcli conn modify "$1" wifi-sec.psk "$2"
+	con-name "$1" autoconnect no ssid "$1" \
+	wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$2"
 
-# Free the radio, then activate explicitly rather than leaving it to autoconnect,
-# so the outcome of the association is observable and can be rolled back.
+# Make sure the AP is stopped, then activate the wifi connection.
 sudo systemctl stop nest-access-point.service
 if ! nmcli conn up "$1"; then
-	# Activation failed (wrong password, network out of range, etc.). Remove the
-	# bad profile and bring the AP back so the user can reach the portal to retry;
-	# otherwise a failed join leaves the device with no route in at all.
-	#
-	# 'restart' rather than 'start': the unit is Type=oneshot RemainAfterExit=yes,
-	# so if its last run no-op'd systemd still considers it active and 'start' does
-	# nothing. 'restart' always re-runs ExecStart.
+	# Activation failed (wrong password, network out of range, etc.).
+	# Remove the bad profile and bring the AP back so the user can retry.
+	# Use 'restart' instead of 'start' — the oneshot may be active(exited).
 	nmcli conn delete "$1" 2>/dev/null
 	sudo systemctl restart nest-access-point.service
 	exit 1
 fi
+
+# Activation succeeded, so make the profile persistent across reboots.
+nmcli conn modify "$1" connection.autoconnect yes
