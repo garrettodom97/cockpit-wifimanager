@@ -1,3 +1,13 @@
+cockpit-wifimanager (1.2.0-1scorebird2) unstable; urgency=medium
+
+  * Allow scanning while the access point is up. The guard assumed a single-radio
+    device cannot scan while beaconing; measured on hardware that is false on both
+    bands (31 networks with the AP on ch6, 27 with it on ch40), with hostapd and the
+    client association both undisturbed. The guard was hiding the network list during
+    provisioning, when an installer most needs it.
+
+ -- Byron Appelt <bappelt@nevco.com>  Wed, 29 Jul 2026 16:37:49 -0500
+
 cockpit-wifimanager (1.2.0-1scorebird1) unstable; urgency=medium
 
   * Modified by Nevco/Scorebird for NeST scoreboard devices. This is not an
